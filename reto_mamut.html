@@ -219,7 +219,9 @@
         function responder(esCorrecto) {
             document.getElementById('overlay-negro').style.display = "block";
             if (esCorrecto) {
+                // ✅ CORREGIDO
                 localStorage.setItem('reto_mamut', 'completado');
+        
                 document.getElementById('modal-exito').style.display = "block";
                 document.getElementById('escena-reto').style.opacity = "0.3";
             } else {
