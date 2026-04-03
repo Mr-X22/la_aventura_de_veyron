@@ -238,8 +238,11 @@
             msjFin.innerText = msj;
             
             controlesUI.innerHTML = `Presiona <span style="color:#fff">[E]</span> para ${exito ? 'REPETIR' : 'REINTENTAR'}<br>Presiona <span style="color:#fff">[Q]</span> para SALIR`;
-
+        
             if (exito) {
+                // ✅ ESTO NO EXISTÍA → AHORA GUARDA PROGRESO
+                localStorage.setItem('reto_bering', 'completado');
+        
                 let countdown = 15;
                 timerNota.innerText = `Regresando al museo en ${countdown} segundos...`;
                 
