@@ -152,12 +152,12 @@
     window.addEventListener('keydown', (e) => {
         const k = e.key.toLowerCase();
         
-        if (pausado && k === 'e') {
-            if (aciertos[2] >= 8) {
-                localStorage.setItem('progreso_piedra', 'completado');
-                window.location.href = "era_de_hielo.html"; 
-                return;
-            }
+            if (pausado && k === 'e') {
+                if (aciertos[2] >= 8) {
+                    localStorage.setItem('reto_piedra', 'completado'); // ✅ CORREGIDO
+                    window.location.href = "era_de_hielo.html"; 
+                    return;
+                }
             document.getElementById('overlay-narrativo').style.display = 'none';
             document.getElementById('lanza-final').style.display = 'none';
             pausado = false;
@@ -211,7 +211,7 @@
                     aciertos[2]++;
                     if (aciertos[2] >= 8) {
                         pausado = true;
-                        localStorage.setItem('progreso_piedra', 'completado');
+                        localStorage.setItem('reto_piedra', 'completado'); // ✅ CORREGIDO
                         mostrarVitrina('lanza', "¡TECNOLOGÍA COMPLETADA!", "La lanza Clovis está lista para el muro.");
                     }
                 } else { registrarFallo(); }
