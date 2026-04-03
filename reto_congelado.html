@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>BETA V13.9: EL CALOR DE LA SUPERVIVENCIA</title>
+    <style>
+        body { margin: 0; background: #010409; color: #00e5ff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        #hud { width: 1000px; display: flex; justify-content: space-between; padding: 15px; background: #0d1117; border: 1px solid #00e5ff; margin-bottom: 5px; box-sizing: border-box; }
+        
+        #mundo { 
+            position: relative; 
+            width: 1000px; height: 700px; 
+            background-image: url('fondo_nieve.png'); 
+            background-size: cover;
+            border: 4px solid #005a8d; 
+            box-shadow: 0 0 40px #000; 
+            overflow: hidden; 
+        }
+        
+        .entidad { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; background-repeat: no-repeat; }
+
+        #leman, #nom_exp { 
+            width: 80px; height: 80px; z-index: 30;
+            background-size: 320px 80px;
+            background-position: 0px 0px;
+        }
+        #leman { background-image: url('Leman_Veyron.png'); }
+        #nom_exp { background-image: url('nomada.png'); }
+
+        .nomada-estatico { 
+            width: 85px; height: 85px; 
+            background-image: url('nomada_p.png'); 
+            background-size: contain; z-index: 20;
+        }
+
+        #fogata { 
+            width: 160px; height: 160px; 
+            background-image: url('fogata.png'); 
+            background-size: contain; z-index: 5;
+            filter: drop-shadow(0 0 40px rgba(255, 170, 0, 0.8));
+        }
+
+        .antorcha { width: 80px; height: 80px; background-image: url('antorcha_off.png'); background-size: contain; }
+        .antorcha.fuego-on { background-image: url('antorcha_on.png'); filter: drop-shadow(0 0 20px #ff6600); }
+
+        .barra-v { width: 60px; height: 8px; background: rgba(0,0,0,0.6); border: 1px solid #000; margin-top: 90px; position: absolute; }
+        .p-v { height: 100%; background: #00ff00; width: 100%; transition: width 0.2s linear; }
+        
+        #overlay { position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.98); display:none; flex-direction:column; justify-content:center; align-items:center; z-index:100; text-align: center; padding: 50px; box-sizing: border-box; }
+        #btn-e { padding: 15px 30px; background: #ffaa00; color: #000; border: none; font-weight: bold; cursor: pointer; margin-top: 35px; font-family: monospace; font-size: 1.2em; transition: 0.3s; box-shadow: 0 0 15px #ffaa00; }
+        #btn-e:hover { background: #fff; transform: scale(1.05); }
+        .final-msg { color: #fff; font-size: 1.3em; max-width: 750px; line-height: 1.8; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div id="hud">
+    <div>SISTEMA: VEYRON_OS_V13.9</div>
+    <div>LLAMAS ACTIVAS: <span id="v-num">0</span>/4</div>
+    <div id="txt-status" style="color: #ffaa00;">MODO: RESISTENCIA TÉRMICA</div>
+</div>
+
+<div id="mundo">
+    <div id="fogata" class="entidad" style="top:270px; left:420px;"></div>
+    
+    <div id="nom1" class="entidad nomada-estatico" style="top:200px; left:460px;"><div class="barra-v"><div class="p-v"></div></div></div>
+    <div id="nom2" class="entidad nomada-estatico" style="top:350px; left:380px;"><div class="barra-v"><div class="p-v"></div></div></div>
+    <div id="nom3" class="entidad nomada-estatico" style="top:350px; left:540px;"><div class="barra-v"><div class="p-v"></div></div></div>
+
+    <div id="ant1" class="entidad antorcha"><div class="barra-v"><div class="p-v"></div></div></div>
+    <div id="ant2" class="entidad antorcha"><div class="barra-v"><div class="p-v"></div></div></div>
+    <div id="ant3" class="entidad antorcha"><div class="barra-v"><div class="p-v"></div></div></div>
+    <div id="ant4" class="entidad antorcha"><div class="barra-v"><div class="p-v"></div></div></div>
+    <div id="ant5" class="entidad antorcha"><div class="barra-v"><div class="p-v"></div></div></div>
+
+    <div id="leman" class="entidad" style="top:550px; left:400px;"><div class="barra-v"><div class="p-v"></div></div></div>
+    <div id="nom_exp" class="entidad" style="top:550px; left:520px;"><div class="barra-v"><div class="p-v"></div></div></div>
+
+    <div id="overlay">
+        <h1 id="m-tit" style="color: #ff6600; margin-bottom: 20px;"></h1>
+        <div id="m-body" class="final-msg"></div>
+        <button id="btn-e">SEGUIR EL CAMINO [E]</button>
+    </div>
+</div>
+
+<script>
+    let vics = 0, activo = true, caos = false, dif = 1.0, completado = false;
+    const keys = {};
+    const listaAntorchas = ['ant1', 'ant2', 'ant3', 'ant4', 'ant5'];
+    const listaProtegidos = ['nom1', 'nom2', 'nom3'];
+    const C_SIZE = 80, ANT_SIZE = 80, NOM_P_SIZE = 85, FOG_SIZE = 160;
+    const M_WIDTH = 1000, M_HEIGHT = 700;
+
+    const data = {
+        leman: { x: 400, y: 550, on: true, hp: 100, speed: 6 },
+        nom_exp: { x: 520, y: 550, on: true, hp: 100, speed: 6 },
+        nom1: { x: 460, y: 200, on: true, hp: 100 },
+        nom2: { x: 380, y: 350, on: true, hp: 100 },
+        nom3: { x: 540, y: 350, on: true, hp: 100 },
+        ant1: { x: 0, y: 0, on: false, hp: 100 },
+        ant2: { x: 0, y: 0, on: false, hp: 100 },
+        ant3: { x: 0, y: 0, on: false, hp: 100 },
+        ant4: { x: 0, y: 0, on: false, hp: 100 },
+        ant5: { x: 0, y: 0, on: false, hp: 100 },
+        fogata: { x: 420, y: 270 }
+    };
+
+    function updateSpriteAnimation(id, direction) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        let posX;
+        switch(direction) {
+            case 'frente':    posX = '0px'; break;
+            case 'atras':     posX = '-80px'; break;
+            case 'izquierda': posX = '-160px'; break;
+            case 'derecha':   posX = '-240px'; break;
+        }
+        el.style.backgroundPosition = `${posX} 0px`;
+    }
+
+    function gameLoop() {
+        if (!activo) return;
+        let dirL = 'frente', dirN = 'frente', movL = false, movN = false;
+
+        if (data.leman.on) {
+            if (keys['w'] && data.leman.y > 0) { data.leman.y -= data.leman.speed; dirL = 'atras'; movL = true; }
+            else if (keys['s'] && data.leman.y < M_HEIGHT - C_SIZE) { data.leman.y += data.leman.speed; dirL = 'frente'; movL = true; }
+            if (keys['a'] && data.leman.x > 0) { data.leman.x -= data.leman.speed; dirL = 'izquierda'; movL = true; }
+            else if (keys['d'] && data.leman.x < M_WIDTH - C_SIZE) { data.leman.x += data.leman.speed; dirL = 'derecha'; movL = true; }
+            if (movL) updateSpriteAnimation('leman', dirL);
+        }
+
+        if (data.nom_exp.on) {
+            if (keys['arrowup'] && data.nom_exp.y > 0) { data.nom_exp.y -= data.nom_exp.speed; dirN = 'atras'; movN = true; }
+            else if (keys['arrowdown'] && data.nom_exp.y < M_HEIGHT - C_SIZE) { data.nom_exp.y += data.nom_exp.speed; dirN = 'frente'; movN = true; }
+            if (keys['arrowleft'] && data.nom_exp.x > 0) { data.nom_exp.x -= data.nom_exp.speed; dirN = 'izquierda'; movN = true; }
+            else if (keys['arrowright'] && data.nom_exp.x < M_WIDTH - C_SIZE) { data.nom_exp.x += data.nom_exp.speed; dirN = 'derecha'; movN = true; }
+            if (movN) updateSpriteAnimation('nom_exp', dirN);
+        }
+
+        ['leman', 'nom_exp'].forEach(p => {
+            if (rectIntersect(data[p], C_SIZE, data.fogata, FOG_SIZE - 20)) { data[p].hp = 100; data[p].on = true; }
+            listaAntorchas.forEach(a => {
+                if (data[p].on && rectIntersect(data[p], C_SIZE, data[a], ANT_SIZE)) {
+                    data[a].on = true; if (!caos) data[a].hp = 100;
+                }
+            });
+            listaProtegidos.forEach(n => {
+                if (data[p].on && rectIntersect(data[p], C_SIZE, data[n], NOM_P_SIZE)) {
+                    data[n].hp = Math.min(100, data[n].hp + 6); data[n].on = true;
+                }
+            });
+        });
+
+        ['leman', 'nom_exp'].forEach(p => { data[p].hp -= 0.18 * dif; if (data[p].hp <= 0) data[p].on = false; });
+        listaProtegidos.forEach(n => { data[n].hp -= 0.15 * dif; if (data[n].hp <= 0) finalizarRonda(false); });
+        
+        if (!data.leman.on && !data.nom_exp.on) finalizarRonda(false);
+
+        if (caos) {
+            let algunaOn = false;
+            listaAntorchas.forEach(a => {
+                if (data[a].on) { algunaOn = true; data[a].hp -= 0.45 * dif; if (data[a].hp <= 0) data[a].on = false; }
+            });
+            if (!algunaOn) finalizarRonda(true);
+        }
+        if (!caos && listaAntorchas.every(a => data[a].on)) caos = true;
+
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function finalizarRonda(exito) {
+        activo = false;
+        if (exito) vics++;
+        document.getElementById('v-num').innerText = vics;
+        const overlay = document.getElementById('overlay');
+        overlay.style.display = 'flex';
+        
+        if (vics >= 4) {
+            completado = true;
+            // INTEGRACIÓN: Se usa la llave y valor que espera era_de_hielo.html
+            localStorage.setItem('progreso_fuego', 'completado'); 
+            
+            document.getElementById('m-tit').innerText = "EL LADO DEL CALOR";
+            document.getElementById('m-body').innerHTML = '"El fuego no es solo calor; es la herramienta maxima en la evolución. Sin su luz, el hielo reclamaría nuestra historia, sin el fuego no sabriamos ni lo que es la cocción."';
+        } else {
+            document.getElementById('m-tit').innerText = exito ? "RESISTENCIA LOGRADA" : "EL FRÍO TE RECLAMA";
+            document.getElementById('m-body').innerText = exito ? "El calor se mantiene, por ahora..." : "La escarcha ha silenciado tus pasos.";
+            document.getElementById('btn-e').innerText = "VOLVER A INTENTAR [E]";
+        }
+    }
+
+    function avanzar() {
+        if (document.getElementById('overlay').style.display !== 'flex') return;
+        if (completado) {
+            window.location.href = "era_de_hielo.html"; 
+        } else {
+            dif += 0.45;
+            document.getElementById('overlay').style.display = 'none';
+            reset();
+        }
+    }
+
+    function reset() {
+        data.leman.x = 400; data.leman.y = 550; data.leman.hp = 100; data.leman.on = true;
+        data.nom_exp.x = 520; data.nom_exp.y = 550; data.nom_exp.hp = 100; data.nom_exp.on = true;
+        listaProtegidos.forEach(n => { data[n].hp = 100; data[n].on = true; });
+        listaAntorchas.forEach(a => { data[a].on = false; data[a].hp = 100; });
+        moverAntorchas();
+        updateSpriteAnimation('leman', 'frente'); updateSpriteAnimation('nom_exp', 'frente');
+        caos = false; activo = true;
+        gameLoop();
+    }
+
+    function rectIntersect(a, sA, b, sB) { return a.x < b.x + sB && a.x + sA > b.x && a.y < b.y + sB && a.y + sA > b.y; }
+
+    function draw() {
+        Object.keys(data).forEach(id => {
+            const el = document.getElementById(id); if (!el) return;
+            el.style.left = data[id].x + 'px'; el.style.top = data[id].y + 'px';
+            if (data[id].on !== undefined) {
+                el.classList.toggle('fuego-on', data[id].on);
+                const bar = el.querySelector('.p-v'); if (bar) bar.style.width = data[id].hp + '%';
+            }
+        });
+    }
+
+    function moverAntorchas() {
+        listaAntorchas.forEach(id => {
+            let valid = false;
+            while(!valid) {
+                let nx = Math.random() * (M_WIDTH - 200) + 100;
+                let ny = Math.random() * (M_HEIGHT - 200) + 100;
+                let dist = Math.sqrt(Math.pow(nx - 500, 2) + Math.pow(ny - 350, 2));
+                if (dist > 250) { data[id].x = nx; data[id].y = ny; valid = true; }
+            }
+        });
+    }
+
+    window.onkeydown = (e) => { 
+        keys[e.key.toLowerCase()] = true; 
+        if (e.key.toLowerCase() === 'e') avanzar();
+    };
+    window.onkeyup = (e) => { keys[e.key.toLowerCase()] = false; };
+    
+    moverAntorchas();
+    gameLoop();
+</script>
+</body>
+</html>

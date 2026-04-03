@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SISTEMA VEYRON: MIGRACIÓN BERINGIA B4.0</title>
+    <style>
+        body { margin: 0; background: #1a1a1a; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; }
+
+        #escena-juego {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-image: url('fondo_bering.png');
+            background-size: cover;
+            border: 4px solid #444;
+            overflow: hidden;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+        }
+
+        .entidad {
+            position: absolute;
+            width: 60px; 
+            height: 60px;
+            background-repeat: no-repeat;
+            background-size: 400% 100%; 
+            z-index: 20;
+            image-rendering: pixelated; 
+        }
+
+        #jugador { background-image: url('Leman_Veyron.png'); background-position: 0% 0%; }
+        .nomada { background-image: url('nomada.png'); transition: filter 0.3s, opacity 0.3s; }
+
+        .bloque { position: absolute; z-index: 10; background-size: 100% 100%; }
+        #meta { position: absolute; top: 0; width: 100%; height: 60px; background: rgba(0, 170, 255, 0.2); border-bottom: 4px solid #00aaff; text-align: center; line-height: 60px; font-weight: bold; color: #fff; z-index: 5; text-shadow: 1px 1px 5px #000; }
+        #contador { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); color: #fff; padding: 8px 15px; border-radius: 5px; z-index: 30; border: 1px solid #00aaff; }
+        
+        /* OVERLAY MEJORADO */
+        #overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.9); color: #fff; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            z-index: 100; text-align: center; 
+        }
+
+        .instrucciones { color: #00aaff; font-weight: bold; margin-top: 20px; font-size: 1.2em; }
+        .timer-nota { font-size: 0.9em; color: #888; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>SISTEMA VEYRON: MIGRACIÓN BERINGIA</h1>
+
+    <div id="escena-juego">
+        <div id="meta">ZONA SEGURA: AMÉRICA</div>
+        <div id="jugador" class="entidad"></div>
+        <div id="contador">Tribu: 5/5</div>
+        
+        <div id="overlay">
+            <h2 id="titulo-fin">MÓDULO DE SUPERVIVENCIA</h2>
+            <p id="msj-fin">Guía a la tribu a través del hielo.</p>
+            <div id="controles-ui" class="instrucciones">
+                Presiona <span style="color:#fff">[E]</span> para COMENZAR<br>
+                Presiona <span style="color:#fff">[Q]</span> para SALIR
+            </div>
+            <p id="timer-auto" class="timer-nota"></p>
+        </div>
+    </div>
+
+    <script>
+        const escena = document.getElementById('escena-juego');
+        const pJugador = document.getElementById('jugador');
+        const contDisp = document.getElementById('contador');
+        const overlay = document.getElementById('overlay');
+        const msjFin = document.getElementById('msj-fin');
+        const tituloFin = document.getElementById('titulo-fin');
+        const controlesUI = document.getElementById('controles-ui');
+        const timerNota = document.getElementById('timer-auto');
+
+        let juegoActivo = false;
+        let finalizado = false;
+        let animId, spawnId, autoExitTimer;
+        let posX, posY;
+        let nomadas = [], bloques = [], historialPos = [];
+        const teclas = {}, velocidad = 6, retrasoEntreNomadas = 12;
+
+        // --- MANEJO DE TECLADO (CONTROLES Y MENÚS) ---
+        window.onkeydown = (e) => {
+            const key = e.key.toLowerCase();
+            teclas[key] = true;
+
+            // Lógica de menús
+            if (!juegoActivo) {
+                if (key === 'e') iniciarJuego();
+                if (key === 'q') window.location.href = 'era_de_hielo.html';
+            }
+        };
+        window.onkeyup = (e) => teclas[e.key.toLowerCase()] = false;
+
+        function actualizarSprites() {
+            let posPX = "0%";
+            if (teclas['w'] || teclas['arrowup']) posPX = "33.33%";
+            else if (teclas['s'] || teclas['arrowdown']) posPX = "0%";
+            else if (teclas['a'] || teclas['arrowleft']) posPX = "66.66%";
+            else if (teclas['d'] || teclas['arrowright']) posPX = "100%";
+
+            pJugador.style.backgroundPositionX = posPX;
+            nomadas.forEach(n => { if (n.vivo) n.div.style.backgroundPositionX = posPX; });
+        }
+
+        function iniciarJuego() {
+            clearTimeout(autoExitTimer); // Cancelar salida automática si reintenta rápido
+            juegoActivo = false;
+            finalizado = false;
+            cancelAnimationFrame(animId);
+            clearTimeout(spawnId);
+            
+            bloques.forEach(b => b.remove());
+            nomadas.forEach(n => n.div.remove());
+            bloques = []; nomadas = []; historialPos = [];
+            
+            posX = 370; posY = 520;
+            pJugador.style.left = posX + 'px';
+            pJugador.style.top = posY + 'px';
+
+            for(let i=0; i<5; i++) {
+                let div = document.createElement('div');
+                div.className = 'entidad nomada';
+                escena.appendChild(div);
+                nomadas.push({ div: div, vivo: true });
+            }
+            for(let i=0; i<250; i++) historialPos.push({x: posX, y: posY});
+
+            overlay.style.display = 'none';
+            timerNota.innerText = "";
+            actualizarContadorVisual();
+            
+            setTimeout(() => { 
+                juegoActivo = true; 
+                generarHielo(); 
+                loop(); 
+            }, 100);
+        }
+
+        function loop() {
+            if (!juegoActivo) return;
+
+            if (teclas['w'] || teclas['arrowup']) posY -= velocidad;
+            if (teclas['s'] || teclas['arrowdown']) posY += velocidad;
+            if (teclas['a'] || teclas['arrowleft']) posX -= velocidad;
+            if (teclas['d'] || teclas['arrowright']) posX += velocidad;
+
+            posX = Math.max(0, Math.min(posX, 740));
+            posY = Math.max(-40, Math.min(posY, 540));
+
+            pJugador.style.left = posX + 'px';
+            pJugador.style.top = posY + 'px';
+
+            actualizarSprites();
+
+            historialPos.unshift({x: posX, y: posY});
+            if (historialPos.length > 250) historialPos.pop();
+
+            let cruzados = 0, vivosCount = 0;
+            nomadas.forEach((n, i) => {
+                if (n.vivo) {
+                    vivosCount++;
+                    let idx = (i + 1) * retrasoEntreNomadas;
+                    let pos = historialPos[idx] || historialPos[historialPos.length - 1];
+                    n.div.style.left = pos.x + 'px';
+                    n.div.style.top = pos.y + 'px';
+                    if (pos.y < 50) cruzados++;
+                    verificarColision(n.div, n);
+                }
+            });
+
+            bloques.forEach((b, i) => {
+                let top = parseFloat(b.style.top);
+                b.style.top = (top + 4.8) + 'px';
+                if (top > 600) { b.remove(); bloques.splice(i, 1); }
+            });
+
+            verificarColision(pJugador, null);
+
+            if (posY < 30 && cruzados >= 3 && (cruzados === vivosCount)) {
+                finalizar(true, "¡Victoria! Veyron ha guiado a la tribu a América.");
+            }
+            animId = requestAnimationFrame(loop);
+        }
+
+        function generarHielo() {
+            if (!juegoActivo) return;
+            const b = document.createElement('div');
+            b.className = 'bloque';
+            const rnd = Math.random();
+            let w, h, img;
+            if (rnd > 0.8) { w = 180; h = 25; img = 'hielo_grande.png'; } 
+            else if (rnd > 0.4) { w = 85; h = 20; img = 'hielo_mediano.png'; } 
+            else { w = 35; h = 15; img = 'hielo_pequeño.png'; }
+            
+            b.style.width = w + 'px'; b.style.height = h + 'px';
+            b.style.backgroundImage = `url('${img}')`;
+            b.style.left = (Math.random() * (800 - w)) + 'px';
+            b.style.top = '-40px';
+            escena.appendChild(b);
+            bloques.push(b);
+            spawnId = setTimeout(generarHielo, Math.random() * 300 + 400);
+        }
+
+        function verificarColision(divEntidad, objNomada) {
+            if (!juegoActivo || divEntidad.offsetTop < 60 || divEntidad.offsetTop > 520) return;
+            const r1 = divEntidad.getBoundingClientRect();
+            for (let b of bloques) {
+                const r2 = b.getBoundingClientRect();
+                if (!(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom)) {
+                    if (divEntidad === pJugador) finalizar(false, "Veyron ha caído bajo el hielo.");
+                    else if (objNomada && objNomada.vivo) {
+                        objNomada.vivo = false;
+                        objNomada.div.style.filter = "grayscale(100%) opacity(0.3)";
+                        actualizarContadorVisual();
+                    }
+                }
+            }
+        }
+
+        function actualizarContadorVisual() {
+            let vivos = nomadas.filter(n => n.vivo).length;
+            contDisp.innerText = `Tribu: ${vivos}/5`;
+            if (vivos < 3 && juegoActivo) finalizar(false, "La tribu es demasiado pequeña para sobrevivir.");
+        }
+
+        function finalizar(exito, msj) {
+            juegoActivo = false;
+            finalizado = true;
+            overlay.style.display = 'flex';
+            tituloFin.innerText = exito ? "¡LOGRADO!" : "MISIÓN FALLIDA";
+            tituloFin.style.color = exito ? "#00ff88" : "#ff4444";
+            msjFin.innerText = msj;
+            
+            controlesUI.innerHTML = `Presiona <span style="color:#fff">[E]</span> para ${exito ? 'REPETIR' : 'REINTENTAR'}<br>Presiona <span style="color:#fff">[Q]</span> para SALIR`;
+
+            if (exito) {
+                let countdown = 15;
+                timerNota.innerText = `Regresando al museo en ${countdown} segundos...`;
+                
+                autoExitTimer = setInterval(() => {
+                    countdown--;
+                    timerNota.innerText = `Regresando al museo en ${countdown} segundos...`;
+                    if (countdown <= 0) {
+                        clearInterval(autoExitTimer);
+                        window.location.href = 'era_de_hielo.html';
+                    }
+                }, 1000);
+            }
+        }
+    </script>
+</body>
+</html>

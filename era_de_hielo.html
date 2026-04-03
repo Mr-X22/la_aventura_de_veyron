@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Museo Era de Hielo - Veyron 2.5 Final</title>
+    <style>
+        body { 
+            margin: 0; padding: 0;
+            background: #050a0f; color: white; 
+            display: flex; justify-content: center; align-items: center;
+            font-family: 'Segoe UI', sans-serif; 
+            height: 100vh; overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 1195px; height: 896px; 
+            background: #000 url('era_hielo.png.png') no-repeat center;
+            background-size: 100% 100%;
+            border: 3px solid #00aaff;
+            box-shadow: 0 0 20px rgba(0, 170, 255, 0.4);
+            overflow: hidden;
+        }
+
+        #jugador {
+            position: absolute;
+            width: 64px; height: 64px;
+            z-index: 20;
+            display: flex; justify-content: center; align-items: flex-end; 
+            pointer-events: none;
+        }
+
+        #sprite-leman {
+            width: 64px; height: 64px;
+            background-image: url('leman_veyron.png');
+            background-size: 256px 64px;
+            background-position: 0px 0px;
+            image-rendering: pixelated;
+            transform: scale(2.5); 
+            transform-origin: bottom center; 
+        }
+
+        #capa-profundidad {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; z-index: 25; 
+        }
+
+        .wall { position: absolute; visibility: hidden; }
+
+        /* --- PANTALLA NEGRA DE DECISIÓN --- */
+        #info-box {
+            position: absolute; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95); 
+            border: 2px solid #00aaff;
+            padding: 30px; border-radius: 12px; 
+            display: none; z-index: 100;
+            font-size: 20px; color: #fff;
+            text-align: center; min-width: 400px;
+            box-shadow: 0 0 30px #00aaff;
+        }
+
+        .opciones { margin-top: 25px; display: flex; justify-content: center; gap: 20px; }
+        .key-hint { padding: 8px 15px; border-radius: 5px; font-weight: bold; font-size: 16px; }
+        .key-e { background: #00ff88; color: #000; border: 2px solid #00ff88; }
+        .key-q { background: #ff4444; color: #fff; border: 2px solid #ff4444; }
+
+        /* ESTILO DEL BANNER DE VICTORIA */
+        #victory-banner {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 234, 255, 0.9); color: #000; padding: 15px 30px;
+            border: 3px solid #fff; font-family: 'Courier New', monospace;
+            font-weight: bold; z-index: 1000; border-radius: 10px;
+            box-shadow: 0 0 20px #00eaff; display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="victory-banner"></div>
+
+        <div id="jugador" style="left: 200px; top: 750px;">
+            <div id="sprite-leman"></div>
+        </div>
+
+        <img id="capa-profundidad" src="era_hielo_profundidad.png">
+
+        <div class="wall" style="left:-0.06px; top:0px; width:35.93px; height:891.93px;"></div>
+        <div class="wall" style="left:1165.93px; top:0.99px; width:27.93px; height:889.95px;"></div>
+        <div class="wall" style="left:0.98px; top:0.04px; width:1170.88px; height:273.9px;"></div>
+        <div class="wall" style="left:39.05px; top:881.13px; width:1121.88px; height:11.86px;"></div>
+        <div class="wall" style="left:35px; top:278.06px; width:518.86px; height:137.86px;"></div>
+        <div class="wall" style="left:711.06px; top:273.13px; width:450.8px; height:139.8px;"></div>
+        <div class="wall" style="left:54.98px; top:604.06px; width:269.88px; height:161.86px;"></div>
+        <div class="wall" style="left:500px; top:605.06px; width:271.86px; height:185.86px;"></div>
+        <div class="wall" style="left:943px; top:533.06px; width:207.86px; height:238.86px;"></div>
+
+        <div class="wall portal-trigger" style="left:173.06px; top:869.13px; width:84.86px; height:27.86px;" data-target="index.html"></div>
+        
+        <div class="wall challenge-trigger" style="left:710.13px; top:779.2px; width:65.73px; height:47.73px;" data-target="reto_mamut.html" data-id="reto_mamut" data-nombre="Fósil de Mamut"></div>
+        
+        <div class="wall challenge-trigger" style="left:868px; top:413.06px; width:63.86px; height:50.86px;" data-target="reto_bering.html" data-id="reto_bering" data-req="reto_mamut" data-nombre="Estrecho de Bering"></div>
+        
+        <div class="wall challenge-trigger" style="left:129.98px; top:741.06px; width:171.88px; height:44.86px;" data-target="reto_piedra.html" data-id="reto_piedra" data-req="reto_bering" data-nombre="Herramientas de Piedra"></div>
+        
+        <div class="wall challenge-trigger" style="left:117.98px; top:416.06px; width:66.88px; height:49.86px;" data-target="reto_congelado.html" data-id="reto_congelado" data-req="reto_piedra" data-nombre="Muro Congelado"></div>
+        
+        <div class="wall challenge-trigger" style="left:996px; top:740.06px; width:100px; height:50px;" data-target="boss_deshielo.html" data-id="boss__deshielo" data-req="reto_congelado" data-nombre="EL GRAN DESHIELO"></div>
+
+        <div id="info-box"></div>
+    </div>
+
+    <script>
+        const jugador = document.getElementById('jugador');
+        const sprite = document.getElementById('sprite-leman');
+        const infoBox = document.getElementById('info-box');
+        const muros = document.querySelectorAll('.wall');
+        
+        let posX = 200; let posY = 750;
+        const velocidad = 10;
+        const teclas = {};
+        let bloqueado = false; 
+        let zonaActual = null;
+
+        const hbW = 40; const hbH = 15; 
+
+        function revisarColisiones(nx, ny) {
+            const ox = (64 - hbW) / 2;
+            const oy = 64 - hbH; 
+            const r1 = { left: nx + ox, top: ny + oy, right: nx + ox + hbW, bottom: ny + oy + hbH };
+            
+            for (let muro of muros) {
+                const r2 = { 
+                    left: parseFloat(muro.style.left), top: parseFloat(muro.style.top), 
+                    right: parseFloat(muro.style.left) + parseFloat(muro.style.width), 
+                    bottom: parseFloat(muro.style.top) + parseFloat(muro.style.height) 
+                };
+
+                if (!(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom)) {
+                    if (muro.classList.contains('portal-trigger')) {
+                        // Antes de salir, si ganamos el boss, nos aseguramos de marcar el regreso
+                        if (localStorage.getItem('boss__deshielo') === 'completado') {
+                            localStorage.setItem('vengo_de_hielo', 'true');
+                        }
+                        window.location.href = muro.dataset.target;
+                        return true;
+                    }
+                    if (muro.classList.contains('challenge-trigger')) {
+                        lanzarEvento(muro);
+                        return true; 
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function lanzarEvento(muro) {
+            if (bloqueado) return;
+            bloqueado = true; 
+            zonaActual = muro;
+
+            const req = muro.dataset.req;
+            const nombre = muro.dataset.nombre;
+            const idMision = muro.dataset.id;
+            
+            // VALIDACIÓN DE PROGRESO LINEAL
+            if (req && localStorage.getItem(req) !== 'completado') {
+                // Traducir IDs técnicos a nombres legibles para el mensaje de error
+                let nombreReq = req.replace('reto_', '').toUpperCase();
+                if(req === 'reto_congelado') nombreReq = 'RETO CONGELADO';
+
+                infoBox.innerHTML = `
+                    <h2 style="color:#ff4444;">EXHIBICIÓN BLOQUEADA</h2>
+                    <p>Para analizar <b>${nombre}</b>,<br>debes completar primero el reto anterior: <br><b style="color:#00aaff;">${nombreReq}</b></p>
+                    <div class="opciones">
+                        <div class="key-hint key-q">[Q] SALIR DEL MENSAJE</div>
+                    </div>
+                `;
+            } else {
+                infoBox.innerHTML = `
+                    <h2 style="color:#00aaff;">${nombre}</h2>
+                    <p>¿Deseas realizar esta investigación?</p>
+                    <div class="opciones">
+                        <div class="key-hint key-e">[E] REALIZARLA</div>
+                        <div class="key-hint key-q">[Q] AHORA NO</div>
+                    </div>
+                `;
+            }
+            infoBox.style.display = "block";
+        }
+
+        function cerrarEvento() {
+            infoBox.style.display = "none";
+            posX -= (teclas['d'] || teclas['arrowright']) ? 15 : 0;
+            posX += (teclas['a'] || teclas['arrowleft']) ? 15 : 0;
+            posY -= (teclas['s'] || teclas['arrowdown']) ? 15 : 0;
+            posY += (teclas['w'] || teclas['arrowup']) ? 15 : 0;
+            
+            bloqueado = false; 
+            zonaActual = null;
+        }
+
+        window.addEventListener('keydown', e => { 
+            const tecla = e.key.toLowerCase();
+            
+            if (bloqueado) {
+                if (tecla === 'q') cerrarEvento();
+                if (tecla === 'e' && infoBox.innerHTML.includes('REALIZARLA')) {
+                    window.location.href = zonaActual.dataset.target;
+                }
+                return; 
+            }
+
+            teclas[tecla] = true;
+            if(e.key.includes("Arrow")) e.preventDefault(); 
+        });
+
+        window.addEventListener('keyup', e => teclas[e.key.toLowerCase()] = false);
+
+        function loop() {
+            if (!bloqueado) {
+                let sigX = posX, sigY = posY;
+
+                if (teclas['w'] || teclas['arrowup']) { sigY -= velocidad; sprite.style.backgroundPosition = "-64px 0px"; }
+                else if (teclas['s'] || teclas['arrowdown']) { sigY += velocidad; sprite.style.backgroundPosition = "0px 0px"; }
+                if (teclas['a'] || teclas['arrowleft']) { sigX -= velocidad; sprite.style.backgroundPosition = "-128px 0px"; }
+                else if (teclas['d'] || teclas['arrowright']) { sigX += velocidad; sprite.style.backgroundPosition = "-192px 0px"; }
+
+                if (!revisarColisiones(sigX, posY)) posX = sigX;
+                if (!revisarColisiones(posX, sigY)) posY = sigY;
+
+                jugador.style.left = posX + 'px';
+                jugador.style.top = posY + 'px';
+                jugador.style.zIndex = (posY + 64 < 410) ? "15" : "25";
+            }
+            requestAnimationFrame(loop);
+        }
+        
+        loop();
+
+        // ==========================================
+        // LÓGICA DE PROGRESO INTEGRADA
+        // ==========================================
+        window.addEventListener('load', function() {
+            // Detectar si venimos de completar el Boss
+            const victoriaBoss = localStorage.getItem('boss__deshielo');
+
+            if (victoriaBoss === 'completado') {
+                // Registrar el progreso global para que el Index lo sepa
+                localStorage.setItem('progreso_boss', 'completado');
+                localStorage.setItem('vengo_de_hielo', 'true');
+
+                const banner = document.getElementById('victory-banner');
+                banner.innerHTML = "¡LA ERA DE HIELO HA SIDO SUPERADA!<br>Progreso guardado. Puedes volver al museo.";
+                banner.style.display = "block";
+
+                setTimeout(() => { banner.style.display = "none"; }, 5000);
+            }
+        });
+    </script>
+</body>
+</html>

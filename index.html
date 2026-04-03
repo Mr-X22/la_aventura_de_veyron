@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Museo Añil - Leman Veyron</title>
+    <style>
+        body { 
+            background: #000; color: white; display: flex; flex-direction: column; 
+            align-items: center; font-family: 'Courier New', monospace; margin: 0; padding: 20px; overflow: hidden; 
+        }
+        
+        #game-container {
+            position: relative;
+            width: 520px; height: 520px;
+            border: 8px solid #333;
+            background: #000;
+        }
+
+        /* Botón de reinicio para pruebas */
+        #btn-reset {
+            margin-bottom: 10px;
+            padding: 5px 15px;
+            background: #1a1a1a;
+            color: #ff3333;
+            border: 1px solid #ff3333;
+            cursor: pointer;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+        #btn-reset:hover { background: #330000; color: #fff; }
+
+        #transition-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: black; z-index: 200; opacity: 0;
+            transition: opacity 0.8s ease-in-out; pointer-events: none;
+        }
+
+        .wall { 
+            position: absolute; z-index: 20; background: rgba(0, 0, 0, 0); 
+            border: none; display: flex; justify-content: center; align-items: center;
+        }
+
+        #map-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('museo.png'); background-size: 100% 100%; z-index: 1; }
+        
+        #player { position: absolute; width: 64px; height: 64px; z-index: 15; display: flex; justify-content: center; align-items: flex-end; }
+        
+        #sprite-leman { 
+            width: 64px; height: 64px; background-image: url('leman_veyron.png'); 
+            background-size: 256px 64px; image-rendering: pixelated; 
+            transform: scale(1.5); transform-origin: bottom center; background-position: 0px 0px;
+        }
+        
+        #info-box {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); color: #00ffff; border: 1px solid #00ffff;
+            padding: 10px; border-radius: 5px; z-index: 100; opacity: 0; transition: 0.3s;
+            text-align: center; width: 80%;
+        }
+
+        #boss-message {
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            background: rgba(20, 0, 0, 0.9); color: #ff0000; border: 2px solid #550000;
+            padding: 15px; border-radius: 0px; z-index: 150; opacity: 0; 
+            transition: opacity 1s ease; text-align: center; width: 85%;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+            font-weight: bold; font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="btn-reset" onclick="reiniciarMision()">Reiniciar Era de Hielo</button>
+    <h2>🏛️ MUSEO AÑIL</h2>
+
+    <div id="game-container">
+        <div id="transition-overlay"></div>
+        <div id="info-box"></div>
+        <div id="boss-message"></div> 
+        <div id="map-bg"></div>
+        
+        <div id="player" style="left: 228px; top: 380px;">
+            <div id="sprite-leman"></div>
+        </div>
+
+        <div class="wall portal-civilizacion" id="p-civil" style="left: 65px; top: 61px; width: 90px; height: 150px;"></div>
+        <div class="wall portal-hielo" style="left: 366px; top: 61px; width: 89px; height: 152px;"></div>
+        <div class="wall" style="left: 185px; top: 210px; width: 150px; height: 90px;"></div>
+        <div class="wall" style="left: 220px; top: 85px; width: 80px; height: 60px;"></div>
+        <div class="wall" style="left: 6.4px; top: 85px; width: 53px; height: 341px;"></div>
+        <div class="wall" style="left: 469.4px; top: 86px; width: 37px; height: 348px;"></div>
+    </div>
+
+    <script>
+        const player = document.getElementById('player');
+        const sprite = document.getElementById('sprite-leman');
+        const overlay = document.getElementById('transition-overlay');
+        const infoBox = document.getElementById('info-box');
+        const bossMsg = document.getElementById('boss-message');
+        const hbW = 24; const hbH = 12;
+
+        // --- FUNCIÓN DE REINICIO DE MISIÓN ---
+        function reiniciarMision() {
+            if(confirm("¿Reiniciar Era de Hielo? Solo quedará disponible reto_mamut.")) {
+                // Limpiar estados de victoria y voz
+                localStorage.removeItem('progreso_boss');
+                localStorage.removeItem('mensaje_voz_visto');
+                localStorage.removeItem('vengo_de_hielo');
+                localStorage.removeItem('boss__deshielo');
+                
+                // Limpiar retos específicos
+                localStorage.removeItem('reto_mamut');
+                localStorage.removeItem('reto_bering');
+                localStorage.removeItem('reto_piedra');
+                localStorage.removeItem('reto_congelado');
+                
+                // Establecer reto inicial
+                localStorage.setItem('reto_actual', 'reto_mamut');
+                
+                alert("Misión reiniciada. Estado: Reto Mamut disponible.");
+                location.reload();
+            }
+        }
+
+        window.onload = () => {
+            const progreso = localStorage.getItem('progreso_boss');
+            const mensajeVisto = localStorage.getItem('mensaje_voz_visto');
+            const vinoDeHielo = localStorage.getItem('vengo_de_hielo');
+
+            // Solo mostrar si viene de la sala tras ganar y no se ha visto el mensaje aún
+            if (progreso === 'completado' && vinoDeHielo === 'true' && !mensajeVisto) {
+                setTimeout(() => {
+                    bossMsg.innerText = "Voz misteriosa: Veo que Morbos no pudo detenerte, te he observado y no me agradas. Veremos si lo siguiente es de tu talla ....";
+                    bossMsg.style.opacity = "1";
+                    localStorage.setItem('mensaje_voz_visto', 'true');
+                    localStorage.removeItem('vengo_de_hielo'); // Consumir bandera de procedencia
+                    setTimeout(() => { bossMsg.style.opacity = "0"; }, 7000);
+                }, 1500);
+            }
+        };
+
+        function mostrarMensaje(txt) {
+            infoBox.innerText = txt;
+            infoBox.style.opacity = "1";
+            setTimeout(() => infoBox.style.opacity = "0", 2500);
+        }
+
+        function viajar(url) {
+            overlay.style.opacity = "1";
+            setTimeout(() => { window.location.href = url; }, 800);
+        }
+
+        function move(dx, dy) {
+            let x = parseInt(player.style.left), y = parseInt(player.style.top);
+            let nX = x + dx, nY = y + dy;
+            let hit = false;
+
+            // Sprites direccionales
+            if (dy < 0) sprite.style.backgroundPosition = "-64px 0px"; 
+            if (dy > 0) sprite.style.backgroundPosition = "0px 0px";   
+            if (dx > 0) sprite.style.backgroundPosition = "-192px 0px";
+            if (dx < 0) sprite.style.backgroundPosition = "-128px 0px";
+
+            document.querySelectorAll('.wall').forEach(w => {
+                const ox = (64 - hbW) / 2;
+                const oy = 64 - hbH;
+                let pR = { x: nX + ox, y: nY + oy, w: hbW, h: hbH };
+                let wR = { x: parseFloat(w.style.left), y: parseFloat(w.style.top), w: parseFloat(w.style.width), h: parseFloat(w.style.height) };
+                
+                if (pR.x < wR.x + wR.w && pR.x + pR.w > wR.x && pR.y < wR.y + wR.h && pR.y + pR.h > wR.y) {
+                    if (w.classList.contains('portal-civilizacion')) {
+                        if (localStorage.getItem('progreso_boss') === 'completado') {
+                            viajar("era_de_las_civilizaciones.html");
+                        } else {
+                            mostrarMensaje("SALA BLOQUEADA: Completa la Era de Hielo primero.");
+                        }
+                        hit = true;
+                    } else if (w.style.left === '366px' || w.classList.contains('portal-hielo')) { 
+                        viajar("era_de_hielo.html");
+                        hit = true;
+                    } else {
+                        hit = true;
+                    }
+                }
+            });
+
+            if (!hit && nX > -20 && nX < 480 && nY > -10 && nY < 460) {
+                player.style.left = nX + 'px'; 
+                player.style.top = nY + 'px';
+            }
+        }
+
+        window.addEventListener('keydown', e => {
+            const k = e.key.toLowerCase();
+            const step = 10;
+            if (["w","s","a","d","arrowup","arrowdown","arrowleft","arrowright"].includes(k)) e.preventDefault();
+            if (k === "w" || k === "arrowup") move(0, -step);
+            if (k === "s" || k === "arrowdown") move(0, step);
+            if (k === "a" || k === "arrowleft") move(-step, 0);
+            if (k === "d" || k === "arrowright") move(step, 0);
+        });
+    </script>
+</body>
+</html>

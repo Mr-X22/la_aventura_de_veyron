@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Omni-Calibrador V2: Era de Hielo</title>
+    <style>
+        :root { --accent: #00ff88; --bg: #0a0a0a; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        #panel { width: 380px; background: #151515; border-right: 2px solid #333; display: flex; flex-direction: column; padding: 20px; box-shadow: 5px 0 15px rgba(0,0,0,0.5); z-index: 100; overflow-y: auto; }
+        
+        #editor-viewport { flex-grow: 1; overflow: auto; background: #000; position: relative; padding: 50px; display: flex; align-items: flex-start; justify-content: flex-start; }
+        
+        #map-canvas { 
+            position: relative; 
+            width: 1195px; height: 896px; 
+            background-color: #111;
+            background-size: contain; 
+            background-repeat: no-repeat;
+            border: 2px solid #444; 
+        }
+
+        /* Hitboxes */
+        .wall { 
+            position: absolute; border: 2px solid red; background: rgba(255, 0, 0, 0.2); 
+            box-sizing: border-box; cursor: move; display: flex; align-items: center; justify-content: center;
+            font-size: 11px; color: white; text-align: center; font-weight: bold; overflow: hidden;
+        }
+        .wall.solid { border-color: #ff4444; background: rgba(255, 68, 68, 0.3); }
+        .wall.challenge { border-color: #00ff88; background: rgba(0, 255, 136, 0.3); border-style: dashed; }
+        .wall.portal { border-color: #00aaff; background: rgba(0, 170, 255, 0.3); }
+
+        .resizer { position: absolute; width: 12px; height: 12px; background: white; border: 1px solid black; bottom: -6px; right: -6px; cursor: se-resize; z-index: 10; }
+
+        /* Veyron */
+        #veyron-dragger { position: absolute; width: 64px; height: 64px; cursor: grab; z-index: 200; display: flex; justify-content: center; align-items: flex-end; }
+        #sprite-ref { width: 64px; height: 64px; background: url('leman_veyron.png') no-repeat 0 0; background-size: 256px 64px; transform: scale(2.5); transform-origin: bottom center; image-rendering: pixelated; pointer-events: none; }
+        .hitbox-vis { position: absolute; bottom: 0; width: 40px; height: 20px; background: rgba(0,255,0,0.5); border: 1px solid lime; pointer-events: none; }
+
+        /* UI Elements */
+        textarea { width: 100%; height: 100px; background: #000; color: #0f0; border: 1px solid #444; font-family: monospace; font-size: 11px; margin-top: 10px; }
+        button { background: #333; border: 1px solid #555; color: white; padding: 10px; cursor: pointer; border-radius: 4px; margin-bottom: 5px; }
+        button.primary { background: var(--accent); color: black; border: none; font-weight: bold; }
+        select, input { background: #222; border: 1px solid #444; color: white; padding: 8px; width: 100%; margin-bottom: 10px; }
+        .info-card { background: #252525; padding: 10px; border-radius: 5px; font-size: 12px; margin-bottom: 15px; border-left: 3px solid var(--accent); }
+    </style>
+</head>
+<body>
+
+<div id="panel">
+    <h3>🛠️ OMNI-CALIBRADOR V2</h3>
+    
+    <div class="info-card">
+        <b>INSTRUCCIONES:</b><br>
+        1. Selecciona tu mapa abajo.<br>
+        2. Click en el mapa para crear caja.<br>
+        3. Click derecho para borrar caja.
+    </div>
+
+    <label>1. Cargar Mapa (Imagen):</label>
+    <input type="file" id="file-input" accept="image/*" style="margin-bottom:20px;">
+    
+    <div id="edit-options" style="display:none; background: #202020; padding: 15px; border-radius: 8px;">
+        <label><b>TIPO DE HITBOX:</b></label>
+        <select id="type-select" onchange="updateSelected()">
+            <option value="solid">⛔ MURO (Bloqueo)</option>
+            <option value="challenge">🎯 RETO (Tecla E)</option>
+            <option value="portal">🌀 PORTAL (Sala)</option>
+        </select>
+
+        <label>ID / Archivo Destino:</label>
+        <input type="text" id="meta-val" oninput="updateSelected()" placeholder="ej: reto_mamut.html">
+        <button onclick="deleteBox()" style="background:#441111; width:100%;">Borrar Seleccionada</button>
+    </div>
+
+    <button onclick="exportCode()" class="primary" style="margin-top:20px;">GENERAR CÓDIGO HTML</button>
+    <textarea id="io-area" readonly></textarea>
+</div>
+
+<div id="editor-viewport">
+    <div id="map-canvas" oncontextmenu="return false;">
+        <div id="veyron-dragger" style="left: 100px; top: 100px;">
+            <div id="sprite-ref"></div>
+            <div class="hitbox-vis"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('map-canvas');
+    const fileInput = document.getElementById('file-input');
+    const ioArea = document.getElementById('io-area');
+    let selectedBox = null;
+
+    // --- CARGAR IMAGEN ---
+    fileInput.addEventListener('change', function(e) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            canvas.style.backgroundImage = `url('${event.target.result}')`;
+        }
+        reader.readAsDataURL(e.target.files[0]);
+    });
+
+    // --- CREAR CAJAS ---
+    canvas.addEventListener('mousedown', function(e) {
+        if (e.button === 2) return; // Ignorar click derecho aquí
+        if (e.target !== canvas) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const box = createBox(x, y, 100, 50, 'solid', '');
+        selectBox(box);
+    });
+
+    function createBox(x, y, w, h, type, meta) {
+        const box = document.createElement('div');
+        box.className = `wall ${type}`;
+        box.style.left = x + 'px';
+        box.style.top = y + 'px';
+        box.style.width = w + 'px';
+        box.style.height = h + 'px';
+        box.dataset.meta = meta;
+
+        // Resizer
+        const resizer = document.createElement('div');
+        resizer.className = 'resizer';
+        box.appendChild(resizer);
+
+        // Label
+        const label = document.createElement('span');
+        label.className = 'label';
+        box.appendChild(label);
+
+        // Eventos de la caja
+        box.addEventListener('mousedown', function(e) {
+            e.stopPropagation();
+            selectBox(box);
+            if (e.target.className === 'resizer') {
+                startResizing(e, box);
+            } else {
+                startDragging(e, box);
+            }
+        });
+
+        // Click derecho para borrar
+        box.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            box.remove();
+            document.getElementById('edit-options').style.display = 'none';
+        });
+
+        canvas.appendChild(box);
+        updateLabel(box);
+        return box;
+    }
+
+    // --- FUNCIONES DE MOVIMIENTO ---
+    function startDragging(e, box) {
+        const rect = canvas.getBoundingClientRect();
+        let shiftX = e.clientX - box.getBoundingClientRect().left;
+        let shiftY = e.clientY - box.getBoundingClientRect().top;
+
+        function moveAt(ev) {
+            box.style.left = (ev.clientX - rect.left - shiftX) + 'px';
+            box.style.top = (ev.clientY - rect.top - shiftY) + 'px';
+        }
+
+        document.addEventListener('mousemove', moveAt);
+        document.onmouseup = () => document.removeEventListener('mousemove', moveAt);
+    }
+
+    function startResizing(e, box) {
+        function resize(ev) {
+            const rect = box.getBoundingClientRect();
+            box.style.width = (ev.clientX - rect.left) + 'px';
+            box.style.height = (ev.clientY - rect.top) + 'px';
+        }
+
+        document.addEventListener('mousemove', resize);
+        document.onmouseup = () => document.removeEventListener('mousemove', resize);
+    }
+
+    // --- VEYRON DRAG ---
+    const veyron = document.getElementById('veyron-dragger');
+    veyron.addEventListener('mousedown', function(e) {
+        e.stopPropagation();
+        const rect = canvas.getBoundingClientRect();
+        let shiftX = e.clientX - veyron.getBoundingClientRect().left;
+        let shiftY = e.clientY - veyron.getBoundingClientRect().top;
+
+        function moveV(ev) {
+            veyron.style.left = (ev.clientX - rect.left - shiftX) + 'px';
+            veyron.style.top = (ev.clientY - rect.top - shiftY) + 'px';
+        }
+
+        document.addEventListener('mousemove', moveV);
+        document.onmouseup = () => document.removeEventListener('mousemove', moveV);
+    });
+
+    // --- INTERFAZ ---
+    function selectBox(box) {
+        selectedBox = box;
+        document.querySelectorAll('.wall').forEach(b => b.style.outline = 'none');
+        box.style.outline = '3px solid yellow';
+        document.getElementById('edit-options').style.display = 'block';
+        
+        document.getElementById('type-select').value = box.classList.contains('challenge') ? 'challenge' : (box.classList.contains('portal') ? 'portal' : 'solid');
+        document.getElementById('meta-val').value = box.dataset.meta || '';
+    }
+
+    function updateSelected() {
+        if (!selectedBox) return;
+        const type = document.getElementById('type-select').value;
+        selectedBox.className = `wall ${type}`;
+        selectedBox.dataset.meta = document.getElementById('meta-val').value;
+        updateLabel(selectedBox);
+    }
+
+    function updateLabel(box) {
+        const typeStr = box.classList.contains('challenge') ? '🎯' : (box.classList.contains('portal') ? '🌀' : '⛔');
+        box.querySelector('.label').innerText = `${typeStr} ${box.dataset.meta}`;
+    }
+
+    function deleteBox() { if(selectedBox) selectedBox.remove(); document.getElementById('edit-options').style.display = 'none'; }
+
+    function exportCode() {
+        let code = "\n";
+        document.querySelectorAll('.wall').forEach(w => {
+            let cls = "wall";
+            if (w.classList.contains('challenge')) cls += " challenge-trigger";
+            if (w.classList.contains('portal')) cls += " portal-trigger";
+            
+            code += `<div class="${cls}" style="left:${w.style.left}; top:${w.style.top}; width:${w.style.width}; height:${w.style.height};" data-target="${w.dataset.meta}"></div>\n`;
+        });
+        ioArea.value = code;
+    }
+</script>
+</body>
+</html>

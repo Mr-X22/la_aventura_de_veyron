@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reto 1: Gigantes de la Estepa - Sistema Veyron</title>
+    <style>
+        body {
+            margin: 0; padding: 0;
+            background: #00050a; 
+            color: #00e5ff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            display: flex; flex-direction: column; align-items: center;
+            transition: opacity 0.6s;
+        }
+
+        h1 { margin-top: 20px; text-shadow: 0 0 10px rgba(0, 229, 255, 0.7); }
+
+        /* --- BOTÓN REGRESAR --- */
+        #btn-regresar {
+            position: absolute; top: 20px; left: 20px;
+            width: 60px; height: 60px;
+            background: rgba(0, 170, 255, 0.15);
+            border: 2px solid #00aaff;
+            color: #00aaff;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 35px; cursor: pointer; text-decoration: none;
+            transition: 0.3s; z-index: 1000;
+        }
+        #btn-regresar:hover { background: #ff4444; color: white; border-color: white; }
+
+        /* --- CONTENEDOR PRINCIPAL --- */
+        #escena-reto {
+            position: relative;
+            width: 1100px; height: 750px;
+            margin-top: 30px;
+            background: rgba(0, 15, 30, 0.9);
+            border: 3px solid #00aaff;
+            border-radius: 15px;
+            display: flex;
+            box-shadow: 0 0 30px rgba(0, 170, 255, 0.4);
+            transition: opacity 0.5s;
+        }
+
+        /* --- VISOR DE FÓSIL --- */
+        #visor-fosil {
+            flex: 2;
+            position: relative;
+            border-right: 2px solid #00aaff;
+            margin: 20px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #visor-fosil img {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: contain;
+            image-rendering: pixelated;
+        }
+
+        .capa-resalte {
+            display: none;
+            z-index: 5;
+            pointer-events: none;
+            filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.8));
+        }
+
+        /* --- PUNTOS DE ESCANEO --- */
+        .punto {
+            position: absolute;
+            width: 45px; height: 45px;
+            background: rgba(0, 255, 255, 0.5);
+            border: 3px solid white;
+            border-radius: 50%;
+            color: white; font-weight: bold; font-size: 20px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; animation: pulse 1.5s infinite;
+            z-index: 10;
+        }
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.15);} 100% {transform: scale(1);} }
+
+        /* --- PANEL LATERAL --- */
+        #panel-datos {
+            flex: 1;
+            padding: 40px 30px;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex; flex-direction: column; justify-content: center;
+        }
+
+        .mensaje-log {
+            border-left: 4px solid #00e5ff;
+            padding-left: 20px; margin-bottom: 30px;
+            font-size: 19px; line-height: 1.5;
+            background: rgba(0, 229, 255, 0.05);
+            padding: 15px;
+        }
+
+        #pregunta-final { display: none; text-align: center; }
+
+        .opcion {
+            display: block; width: 100%; padding: 15px;
+            margin: 15px 0; background: #001a33;
+            border: 2px solid #00aaff; color: white;
+            font-size: 17px; cursor: pointer; text-align: left;
+            border-radius: 8px;
+        }
+        .opcion:hover { background: #004488; }
+
+        /* --- MENSAJES INTEGRADOS (MODALES) --- */
+        #overlay-negro {
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1500;
+        }
+
+        .modal-interfaz {
+            display: none; position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 40px; border-radius: 15px; text-align: center;
+            z-index: 2000; min-width: 400px;
+        }
+
+        #modal-exito { border: 3px solid #00ff88; background: #001a11; box-shadow: 0 0 30px #00ff88; }
+        #modal-error { border: 3px solid #ff4444; background: #1a0000; box-shadow: 0 0 30px #ff4444; }
+
+        .btn-modal {
+            margin-top: 25px; padding: 12px 30px; font-weight: bold;
+            cursor: pointer; border-radius: 5px; border: none; font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="era_de_hielo.html" id="btn-regresar">←</a>
+
+    <h1>SISTEMA DE ANÁLISIS BIO-ARQUEOLÓGICO V.1</h1>
+
+    <div id="escena-reto">
+        <div id="visor-fosil">
+            <img src="mamut_base.png" id="img-base" alt="Fósil Base">
+
+            <img src="resalte_colmillos.png" id="capa-marfil" class="capa-resalte">
+            <img src="resalte_vertebras.png" id="capa-giba" class="capa-resalte">
+            <img src="resalte_craneo.png" id="capa-molares" class="capa-resalte">
+
+            <div class="punto" style="top: 38%; left: 10%;" onclick="escanear('marfil')">1</div>
+            <div class="punto" style="top: 22%; left: 58%;" onclick="escanear('giba')">2</div>
+            <div class="punto" style="top: 40%; left: 45%;" onclick="escanear('molares')">3</div>
+        </div>
+
+        <div id="panel-datos">
+            <div id="consola">
+                <div class="mensaje-log"><b>[ ESTADO: EN ESPERA ]</b></div>
+                <p>Activa los nodos de escaneo sobre el espécimen para analizar sus adaptaciones evolutivas.</p>
+            </div>
+
+            <div id="pregunta-final">
+                <h3 style="color: yellow;">¿Por qué el Mamut fue el "recurso total" para los humanos del Pleistoceno?</h3>
+                <button class="opcion" onclick="responder(false)"><b>A.</b> Principalmente por la gran cantidad de carne.</button>
+                <button class="opcion" onclick="responder(true)"><b>B.</b> Por proveer carne, grasa, piel para ropa y huesos para herramientas/refugio.</button>
+                <button class="opcion" onclick="responder(false)"><b>C.</b> No era vital, su caza era demasiado peligrosa.</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="overlay-negro"></div>
+
+    <div id="modal-exito" class="modal-interfaz">
+        <h2 style="color: #00ff88; margin-top: 0;">¡ANÁLISIS COMPLETADO!</h2>
+        <p>Los datos han sido sincronizados con el procesador central de Veyron.</p>
+        <p style="color: #fff; font-weight: bold; font-size: 20px;">NUEVA EXHIBICIÓN DISPONIBLE: <br><span style="color: #00aaff;">ESTRECHO DE BERING</span></p>
+        <button class="btn-modal" style="background:#00ff88; color:#000;" onclick="regresar()">VOLVER AL MUSEO</button>
+    </div>
+
+    <div id="modal-error" class="modal-interfaz">
+        <h2 style="color: #ff4444; margin-top: 0;">ERROR DE REGISTRO</h2>
+        <p>Los datos seleccionados no coinciden con la evidencia arqueológica.</p>
+        <button class="btn-modal" style="background:#ff4444; color:#fff;" onclick="cerrarError()">REINTENTAR</button>
+    </div>
+
+    <script>
+        let puntosCompletados = { marfil: false, giba: false, molares: false };
+
+        function escanear(tipo) {
+            document.querySelectorAll('.capa-resalte').forEach(img => img.style.display = 'none');
+            const consola = document.getElementById('consola');
+            let info = "";
+
+            if (tipo === 'marfil') {
+                document.getElementById('capa-marfil').style.display = 'block';
+                info = "<b>[ ANALIZANDO: DEFENSAS DE MARFIL ]</b><br><br>Incisivos de crecimiento continuo. El marfil denso permitía romper costras de hielo.";
+                puntosCompletados.marfil = true;
+            } else if (tipo === 'giba') {
+                document.getElementById('capa-giba').style.display = 'block';
+                info = "<b>[ ANALIZANDO: GIBA ADIPOSA ]</b><br><br>Reserva energética de grasa vital para sobrevivir inviernos extremos.";
+                puntosCompletados.giba = true;
+            } else if (tipo === 'molares') {
+                document.getElementById('capa-molares').style.display = 'block';
+                info = "<b>[ ANALIZANDO: MOLARES ]</b><br><br>Dientes con crestas duras para triturar la vegetación seca de la estepa.";
+                puntosCompletados.molares = true;
+            }
+
+            consola.innerHTML = `<div class="mensaje-log">${info}</div>`;
+            verificarProgreso();
+        }
+
+        function verificarProgreso() {
+            if (puntosCompletados.marfil && puntosCompletados.giba && puntosCompletados.molares) {
+                setTimeout(() => {
+                    document.getElementById('consola').style.display = "none";
+                    document.getElementById('pregunta-final').style.display = "block";
+                }, 2500);
+            }
+        }
+
+        function responder(esCorrecto) {
+            document.getElementById('overlay-negro').style.display = "block";
+            if (esCorrecto) {
+                localStorage.setItem('progreso_mamut', 'completado');
+                document.getElementById('modal-exito').style.display = "block";
+                document.getElementById('escena-reto').style.opacity = "0.3";
+            } else {
+                document.getElementById('modal-error').style.display = "block";
+            }
+        }
+
+        function cerrarError() {
+            document.getElementById('overlay-negro').style.display = "none";
+            document.getElementById('modal-error').style.display = "none";
+        }
+
+        function regresar() {
+            document.body.style.opacity = "0";
+            setTimeout(() => {
+                window.location.href = 'era_de_hielo.html';
+            }, 600);
+        }
+    </script>
+</body>
+</html>

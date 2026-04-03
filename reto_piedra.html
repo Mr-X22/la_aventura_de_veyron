@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SISTEMA VEYRON: TALLER LÍTICO</title>
+    <style>
+        body { margin: 0; background: #000; color: #00e5ff; font-family: 'Courier New', Courier, monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        
+        #interfaz-taller {
+            position: relative; width: 950px; height: 650px;
+            background: #050a0f url('fondo_piedra.png') no-repeat center;
+            background-size: cover; border: 2px solid #005a8d; box-shadow: 0 0 30px #005a8d;
+        }
+
+        #status-panel { position: absolute; top: 30px; right: 40px; padding: 10px 20px; border: 1px solid #005a8d; background: rgba(0, 20, 40, 0.8); z-index: 100; }
+
+        /* --- PIEZA Y MANGO: TAMAÑOS FIJOS --- */
+        #contenedor-escena { 
+            position: absolute; top: 180px; left: 375px; 
+            width: 200px; height: 400px; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+        }
+        
+        #pieza-obsidiana { 
+            width: 180px; height: 160px; 
+            background-size: contain; background-repeat: no-repeat; background-position: center;
+            transition: all 0.3s; z-index: 10; 
+        }
+        
+        #mango { 
+            width: 60px; height: 220px; 
+            background-image: url('mango.png');
+            background-size: contain; background-repeat: no-repeat;
+            display: none; margin-top: -30px; z-index: 5; transition: 0.5s; 
+        }
+
+        /* UI MÓDULOS */
+        .modulo-ui { position: absolute; top: 135px; left: 310px; width: 330px; height: 55px; background: rgba(0,0,0,0.8); border: 1.5px solid #005a8d; display: none; z-index: 60; }
+        
+        #display-ritmo { 
+            position: absolute; top: 135px; left: 310px; 
+            display: flex; gap: 15px; z-index: 50; 
+            width: 330px; justify-content: center;
+        }
+
+        .numero-guia { 
+            width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; 
+            font-size: 2.2em; font-weight: bold; 
+            color: rgba(0, 229, 255, 0.3); background: rgba(0, 10, 20, 0.8); 
+            border: 1.5px solid #005a8d; border-radius: 5px;
+        }
+
+        .numero-guia.activo { color: #00e5ff; background: rgba(0, 229, 255, 0.15); border-color: #00e5ff; text-shadow: 0 0 15px #00e5ff; }
+
+        .hit-blink { color: #00ff88 !important; border-color: #00ff88 !important; }
+
+        #indicador { position: absolute; width: 6px; height: 100%; background: #fff; left: 0; }
+        #zona-critica, #zona-segura { position: absolute; width: 60px; height: 100%; background: rgba(0, 229, 255, 0.3); left: 135px; border-left: 1px solid #00e5ff; border-right: 1px solid #00e5ff; }
+        #puntero-balance { position: absolute; width: 4px; height: 100%; background: #ff3333; left: 50%; }
+
+        /* OVERLAY FINAL: TAMAÑO MEJORADO */
+        #overlay-narrativo { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.95); display: none; flex-direction: column; 
+            justify-content: space-between; align-items: center; z-index: 200; 
+            text-align: center; padding: 40px 0;
+        }
+        #lanza-final { 
+            width: 350px; height: 450px; 
+            background-size: contain; background-repeat: no-repeat; background-position: center;
+            display: none; filter: drop-shadow(0 0 20px #00e5ff);
+        }
+        
+        #btn-e { color: #00e5ff; font-weight: bold; animation: blink 1s infinite; margin-top: 10px; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="interfaz-taller">
+    <div id="status-panel">INTEGRIDAD: <span id="puntos-vida"></span></div>
+
+    <div id="display-ritmo">
+        <div id="n1" class="numero-guia">1</div>
+        <div id="n2" class="numero-guia">2</div>
+        <div id="n3" class="numero-guia">3</div>
+        <div id="n4" class="numero-guia">4</div>
+    </div>
+
+    <div id="contenedor-barra" class="modulo-ui"><div id="zona-critica"></div><div id="indicador"></div></div>
+    <div id="contenedor-balance" class="modulo-ui"><div id="zona-segura"></div><div id="puntero-balance"></div></div>
+
+    <div id="contenedor-escena">
+        <div id="pieza-obsidiana"></div>
+        <div id="mango"></div>
+    </div>
+
+    <div id="overlay-narrativo">
+        <h2 id="titulo-msg"></h2>
+        <div id="lanza-final"></div>
+        <div>
+            <p id="cuerpo-msg" style="max-width: 500px; color: #eee; margin: 0 auto 20px auto;"></p>
+            <div id="btn-e">[ PRESIONA E PARA CONTINUAR ]</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let estacionActual = 1, fallos = 0, pausado = false;
+    let aciertos = [0, 0, 0];
+    let indexS = 0, secuencia = [1, 2, 3, 4];
+    let barraPos = 0, dirBarra = 1, balancePos = 50, tiempoE3 = 0;
+
+    function cambiarImagen(url) {
+        document.getElementById('pieza-obsidiana').style.backgroundImage = `url('${url}.png')`;
+    }
+
+    function registrarFallo() {
+        fallos++;
+        actualizarUI();
+        if (fallos >= 3) {
+            pausado = true;
+            document.getElementById('titulo-msg').innerText = "FRACTURA CRÍTICA";
+            document.getElementById('cuerpo-msg').innerText = "El material colapsó. Reiniciando protocolo...";
+            document.getElementById('overlay-narrativo').style.display = 'flex';
+            setTimeout(() => location.reload(), 3000);
+        }
+    }
+
+    function actualizarUI() {
+        let h = ""; for(let i=0; i<3; i++) h += i < (3-fallos) ? "[■]" : "[X]";
+        document.getElementById('puntos-vida').innerHTML = h;
+    }
+
+    function gameLoop() {
+        if (!pausado) {
+            if (estacionActual === 2) {
+                barraPos += 5 * dirBarra;
+                if (barraPos > 324 || barraPos < 0) dirBarra *= -1;
+                document.getElementById('indicador').style.left = barraPos + 'px';
+            }
+            if (estacionActual === 3) {
+                tiempoE3 += 0.05;
+                balancePos = 50 + (Math.sin(tiempoE3) * 15) + (Math.random() * 2);
+                document.getElementById('puntero-balance').style.left = balancePos + "%";
+                if (balancePos < 5 || balancePos > 95) registrarFallo();
+            }
+        }
+        requestAnimationFrame(gameLoop);
+    }
+
+    window.addEventListener('keydown', (e) => {
+        const k = e.key.toLowerCase();
+        
+        if (pausado && k === 'e') {
+            if (aciertos[2] >= 8) {
+                localStorage.setItem('progreso_piedra', 'completado');
+                window.location.href = "era_de_hielo.html"; 
+                return;
+            }
+            document.getElementById('overlay-narrativo').style.display = 'none';
+            document.getElementById('lanza-final').style.display = 'none';
+            pausado = false;
+            
+            if (estacionActual === 2) {
+                document.getElementById('display-ritmo').style.display = 'none';
+                document.getElementById('contenedor-barra').style.display = 'block';
+            }
+            if (estacionActual === 3) {
+                document.getElementById('contenedor-barra').style.display = 'none';
+                document.getElementById('contenedor-balance').style.display = 'block';
+                document.getElementById('mango').style.display = 'block';
+            }
+            return;
+        }
+
+        if (pausado) return;
+
+        if (estacionActual === 1 && ['1','2','3','4'].includes(k)) {
+            if (k === secuencia[indexS].toString()) {
+                indexS++; aciertos[0]++;
+                if (aciertos[0] === 4) cambiarImagen('obsidiana2');
+                if (aciertos[0] >= 8) {
+                    cambiarImagen('obsidiana3');
+                    estacionActual = 2; pausado = true;
+                    mostrarVitrina('obsidiana3', "FASE 1: COMPLETADA", "Desbaste exitoso.");
+                }
+                document.querySelectorAll('.numero-guia').forEach(x => x.classList.remove('activo'));
+                if (indexS >= 4) { indexS = 0; secuencia.sort(() => Math.random() - 0.5); }
+                document.getElementById(`n${secuencia[indexS]}`).classList.add('activo');
+            } else { registrarFallo(); }
+        }
+
+        else if (estacionActual === 2 && e.code === 'Space') {
+            if (barraPos >= 135 && barraPos <= 195) {
+                aciertos[1]++;
+                if (aciertos[1] === 3) cambiarImagen('punta_lanza1');
+                if (aciertos[1] >= 5) {
+                    cambiarImagen('punta_lanza2');
+                    estacionActual = 3; pausado = true;
+                    mostrarVitrina('punta_lanza2', "FASE 2: COMPLETADA", "Filo serrado obtenido.");
+                }
+            } else { registrarFallo(); }
+        }
+
+        else if (estacionActual === 3) {
+            if (e.key === 'ArrowLeft') tiempoE3 -= 0.2;
+            if (e.key === 'ArrowRight') tiempoE3 += 0.2;
+            if (e.code === 'Space') {
+                if (balancePos > 38 && balancePos < 62) {
+                    aciertos[2]++;
+                    if (aciertos[2] >= 8) {
+                        pausado = true;
+                        localStorage.setItem('progreso_piedra', 'completado');
+                        mostrarVitrina('lanza', "¡TECNOLOGÍA COMPLETADA!", "La lanza Clovis está lista para el muro.");
+                    }
+                } else { registrarFallo(); }
+            }
+        }
+    });
+
+    function mostrarVitrina(img, tit, msg) {
+        const vit = document.getElementById('lanza-final');
+        vit.style.backgroundImage = `url('${img}.png')`;
+        vit.style.display = 'block';
+        
+        // Ajuste dinámico para que la lanza no se encoja
+        if(img === 'lanza') {
+            vit.style.width = "250px"; vit.style.height = "550px";
+        } else {
+            vit.style.width = "300px"; vit.style.height = "300px";
+        }
+
+        document.getElementById('titulo-msg').innerText = tit;
+        document.getElementById('cuerpo-msg').innerText = msg;
+        document.getElementById('overlay-narrativo').style.display = 'flex';
+    }
+
+    window.onload = () => { 
+        actualizarUI(); 
+        cambiarImagen('obsidiana1');
+        document.getElementById('n1').classList.add('activo'); 
+        gameLoop(); 
+    };
+</script>
+</body>
+</html>
